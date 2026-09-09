@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+*.js.map
+.tokengit
+.tutorial.text
+*.sh
