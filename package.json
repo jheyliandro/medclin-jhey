@@ -8,6 +8,7 @@
     "build": "tsc",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
+    "seed:admin": "node dist/database/seed-admin.js",
     "start": "node dist/server.js"
   },
   "dependencies": {
