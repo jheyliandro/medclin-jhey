@@ -10,7 +10,7 @@ router.get(
   authenticate,
   authorize(UserRole.ADMIN),
   (req: Request, res: Response) => {
-    res.status(200).json({ message: 'pong', role: req.user!.role });
+    res.status(200).json({ message: 'pong', roles: req.user!.roles });
   },
 );
 
