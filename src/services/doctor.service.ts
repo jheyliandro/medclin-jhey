@@ -65,6 +65,8 @@ function isUniqueViolation(error: unknown): boolean {
 function validateShifts(shifts: WorkShiftDTO[]): void {
   for (const shift of shifts) {
     if (
+      !shift ||
+      typeof shift !== 'object' ||
       !Number.isInteger(shift.weekDay) ||
       shift.weekDay < 0 ||
       shift.weekDay > 6 ||
@@ -97,9 +99,10 @@ function validateShifts(shifts: WorkShiftDTO[]): void {
 
 function toShiftResponse(shift: WorkShiftDTO): WorkShiftDTO {
   return {
-    ...shift,
+    weekDay: shift.weekDay,
     startTime: shift.startTime.slice(0, 5),
     endTime: shift.endTime.slice(0, 5),
+    slotDurationMinutes: shift.slotDurationMinutes,
   };
 }
 
@@ -125,7 +128,8 @@ export async function createDoctor(
   if (await UserRepository.findByEmail(dto.email)) {
     throw new AppError('E-mail já cadastrado.', 409, 'EMAIL_JA_CADASTRADO');
   }
-  if (await DoctorRepository.findByCrm(dto.crm)) {
+  const crm = dto.crm.trim();
+  if (await DoctorRepository.findByCrm(crm)) {
     throw new AppError('CRM já cadastrado.', 409, 'CRM_JA_CADASTRADO');
   }
 
@@ -133,7 +137,7 @@ export async function createDoctor(
     const doctor = await DoctorRepository.createDoctorWithUser({
       ...dto,
       name: dto.name.trim(),
-      crm: dto.crm.trim(),
+      crm,
       password: await hashPassword(dto.password),
     });
     return toResponse(doctor);
@@ -146,7 +150,7 @@ export async function createDoctor(
           'EMAIL_JA_CADASTRADO',
         );
       }
-      if (await DoctorRepository.findByCrm(dto.crm)) {
+      if (await DoctorRepository.findByCrm(crm)) {
         throw new AppError('CRM já cadastrado.', 409, 'CRM_JA_CADASTRADO');
       }
     }
@@ -201,6 +205,9 @@ export async function replaceWorkSchedule(
     throw new AppError('Médico não encontrado.', 404);
   }
   const shifts = await DoctorRepository.replaceWorkShifts(id, schedule.shifts);
+  if (!shifts) {
+    throw new AppError('Médico não encontrado.', 404);
+  }
   return { shifts: shifts.map(toShiftResponse) };
 }
 

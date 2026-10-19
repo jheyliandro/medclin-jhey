@@ -59,12 +59,12 @@ export async function findWorkShifts(doctorId: number): Promise<WorkShift[]> {
 export async function replaceWorkShifts(
   doctorId: number,
   shifts: WorkShiftDTO[],
-): Promise<WorkShift[]> {
+): Promise<WorkShift[] | null> {
   return AppDataSource.transaction(async (manager) => {
     const doctorRepository = manager.getRepository(Doctor);
     const doctor = await doctorRepository.findOneBy({ id: doctorId });
     if (!doctor) {
-      return [];
+      return null;
     }
 
     const shiftRepository = manager.getRepository(WorkShift);
