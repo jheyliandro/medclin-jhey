@@ -217,6 +217,15 @@ describe('appointment service', () => {
     );
   });
 
+  it('rejects invalid appointment filters', async () => {
+    await expect(
+      listAppointments(
+        { status: 'unknown' },
+        { id: 'admin-id', roles: [UserRole.ADMIN] },
+      ),
+    ).rejects.toMatchObject({ statusCode: 400, code: 'DADOS_INVALIDOS' });
+  });
+
   it('denies a doctor access to another doctor appointment', async () => {
     vi.mocked(AppointmentRepository.findById).mockResolvedValue(appointment);
 
