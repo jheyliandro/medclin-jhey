@@ -17,6 +17,8 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER ?? 'postgres',
   password: process.env.DB_PASS ?? 'postgres',
   database: process.env.DB_NAME ?? 'medclin_db',
+  ssl:
+    process.env.DB_SSL === 'true' ? { rejectUnauthorized: true } : false,
   synchronize: false,
   logging: false,
   entities: [User, Patient, Doctor, WorkShift, Appointment, MedicalRecord],
