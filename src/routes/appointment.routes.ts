@@ -13,6 +13,7 @@ router.post(
   authorize(UserRole.ADMIN, UserRole.SECRETARY),
   AppointmentController.create,
 );
+router.patch('/:id/status', authenticate, AppointmentController.changeStatus);
 router.get('/:id', authenticate, AppointmentController.getById);
 
 export default router;

@@ -159,3 +159,26 @@ export async function listAppointments(filters: {
     .getManyAndCount();
   return { data, total };
 }
+
+export async function saveStatus(
+  appointment: Appointment,
+  status: AppointmentStatus,
+): Promise<Appointment> {
+  appointment.status = status;
+  return AppDataSource.getRepository(Appointment).save(appointment);
+}
+
+export async function hasClinicalRelationship(
+  doctorId: number,
+  patientId: number,
+): Promise<boolean> {
+  const appointment = await AppDataSource.getRepository(Appointment)
+    .createQueryBuilder('appointment')
+    .where('appointment.doctor_id = :doctorId', { doctorId })
+    .andWhere('appointment.patient_id = :patientId', { patientId })
+    .andWhere('appointment.status IN (:...statuses)', {
+      statuses: [AppointmentStatus.IN_PROGRESS, AppointmentStatus.DONE],
+    })
+    .getOne();
+  return appointment !== null;
+}

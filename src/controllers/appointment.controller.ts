@@ -56,3 +56,20 @@ export async function getById(
     next(err);
   }
 }
+
+export async function changeStatus(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const result = await AppointmentService.changeAppointmentStatus(
+      req.params.id,
+      req.body?.status,
+      req.user!,
+    );
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
