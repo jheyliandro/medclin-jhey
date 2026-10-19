@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryFailedError } from 'typeorm';
 import { Doctor } from '../src/entities/Doctor';
+import { WorkScheduleDTO } from '../src/dtos/doctor.dto';
 import { UserRole } from '../src/entities/User';
 import * as DoctorRepository from '../src/repositories/doctor.repository';
 import * as UserRepository from '../src/repositories/user.repository';
@@ -99,7 +101,6 @@ describe('doctor service', () => {
       statusCode: 409,
       code: 'EMAIL_JA_CADASTRADO',
     });
-
     vi.mocked(UserRepository.findByEmail).mockResolvedValue(null);
     vi.mocked(DoctorRepository.findByCrm).mockResolvedValue(doctor);
     await expect(
@@ -112,6 +113,61 @@ describe('doctor service', () => {
     ).rejects.toMatchObject({
       statusCode: 409,
       code: 'CRM_JA_CADASTRADO',
+    });
+  });
+
+  it('maps concurrent CRM conflicts and rethrows unrelated failures', async () => {
+    vi.mocked(UserRepository.findByEmail).mockResolvedValue(null);
+    vi.mocked(DoctorRepository.findByCrm)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(doctor);
+    vi.mocked(DoctorRepository.createDoctorWithUser).mockRejectedValue(
+      new QueryFailedError(
+        'INSERT INTO doctors',
+        [],
+        Object.assign(new Error('duplicate key'), {
+          code: '23505',
+          constraint: 'UQ_doctors_crm',
+        }),
+      ),
+    );
+
+    await expect(
+      createDoctor({
+        name: 'New Doctor',
+        email: 'new@example.com',
+        password: 'secret',
+        crm: 'CRM-SC-54321',
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'CRM_JA_CADASTRADO',
+    });
+
+    const failure = new Error('database unavailable');
+    vi.mocked(DoctorRepository.findByCrm).mockResolvedValue(null);
+    vi.mocked(DoctorRepository.createDoctorWithUser).mockRejectedValue(failure);
+    await expect(
+      createDoctor({
+        name: 'New Doctor',
+        email: 'new@example.com',
+        password: 'secret',
+        crm: 'CRM-SC-54321',
+      }),
+    ).rejects.toBe(failure);
+  });
+
+  it('validates required doctor fields and rejects invalid doctor ids', async () => {
+    await expect(
+      createDoctor({
+        name: '',
+        email: 'invalid',
+        password: '',
+        crm: '',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(getDoctor('not-an-id')).rejects.toMatchObject({
+      statusCode: 400,
     });
   });
 
@@ -210,6 +266,49 @@ describe('doctor service', () => {
     vi.mocked(DoctorRepository.findById).mockResolvedValue(null);
     await expect(getDoctor('999')).rejects.toMatchObject({ statusCode: 404 });
     await expect(getWorkSchedule(999)).rejects.toBeInstanceOf(AppError);
+  });
+
+  it('validates time format, duration, start/end order, and missing shifts', async () => {
+    for (const invalidShift of [
+      {
+        weekDay: 2,
+        startTime: '8:00',
+        endTime: '12:00',
+        slotDurationMinutes: 30,
+      },
+      {
+        weekDay: 2,
+        startTime: '12:00',
+        endTime: '12:00',
+        slotDurationMinutes: 30,
+      },
+      {
+        weekDay: 2,
+        startTime: '08:00',
+        endTime: '12:00',
+        slotDurationMinutes: 0,
+      },
+    ]) {
+      await expect(
+        replaceWorkSchedule(3, { shifts: [invalidShift] }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    }
+
+    await expect(
+      replaceWorkSchedule(3, null as unknown as WorkScheduleDTO),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    vi.mocked(DoctorRepository.findById).mockResolvedValue(doctor);
+    vi.mocked(DoctorRepository.replaceWorkShifts).mockResolvedValue([]);
+    await expect(
+      replaceWorkSchedule(3, { shifts: [] }),
+    ).resolves.toEqual({ shifts: [] });
+  });
+
+  it('returns an empty schedule for doctors without shifts', async () => {
+    vi.mocked(DoctorRepository.findById).mockResolvedValue(doctor);
+    vi.mocked(DoctorRepository.findWorkShifts).mockResolvedValue([]);
+
+    await expect(getWorkSchedule('3')).resolves.toEqual({ shifts: [] });
   });
 
   it('returns a paginated doctor list filtered by name', async () => {

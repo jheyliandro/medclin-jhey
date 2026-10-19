@@ -3,7 +3,7 @@ import { CreateUserDTO } from '../src/dtos/auth.dto';
 import { UserRole } from '../src/entities/User';
 import * as UserRepository from '../src/repositories/user.repository';
 import { hashPassword } from '../src/utils/hash';
-import { createUser } from '../src/services/user.service';
+import { createUser, getMe } from '../src/services/user.service';
 
 vi.mock('../src/repositories/user.repository', () => ({
   findByEmail: vi.fn(),
@@ -89,6 +89,30 @@ describe('user service createUser', () => {
     ).rejects.toMatchObject({
       statusCode: 409,
       code: 'EMAIL_JA_CADASTRADO',
+    });
+  });
+
+  it('returns the authenticated user and rejects an unknown id', async () => {
+    vi.mocked(UserRepository.findById).mockResolvedValue({
+      id: 'user-id',
+      name: 'Joana',
+      email: 'joana@example.com',
+      password: 'hashed',
+      roles: [UserRole.SECRETARY],
+      createdAt: new Date(),
+    });
+
+    await expect(getMe('user-id')).resolves.toEqual({
+      id: 'user-id',
+      name: 'Joana',
+      email: 'joana@example.com',
+      roles: [UserRole.SECRETARY],
+    });
+
+    vi.mocked(UserRepository.findById).mockResolvedValue(null);
+    await expect(getMe('missing')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'RECURSO_NAO_ENCONTRADO',
     });
   });
 });

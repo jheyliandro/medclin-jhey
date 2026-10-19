@@ -114,6 +114,37 @@ describe('medical record service', () => {
     ).rejects.toMatchObject({ statusCode: 403 });
   });
 
+  it('validates patient, text, and doctor before writing', async () => {
+    await expect(
+      createMedicalRecord('bad-id', 'Clinical note', {
+        id: 'doctor-user-id',
+        roles: [UserRole.DOCTOR],
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      createMedicalRecord('10', ' ', {
+        id: 'doctor-user-id',
+        roles: [UserRole.DOCTOR],
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    vi.mocked(PatientRepository.findById).mockResolvedValue(null);
+    await expect(
+      createMedicalRecord('10', 'Clinical note', {
+        id: 'doctor-user-id',
+        roles: [UserRole.DOCTOR],
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    vi.mocked(PatientRepository.findById).mockResolvedValue(patient);
+    vi.mocked(DoctorRepository.findByUserId).mockResolvedValue(null);
+    await expect(
+      createMedicalRecord('10', 'Clinical note', {
+        id: 'doctor-user-id',
+        roles: [UserRole.DOCTOR],
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
   it('allows administrators to read records without a doctor relationship', async () => {
     vi.mocked(DoctorRepository.findByUserId).mockResolvedValue(null);
     vi.mocked(MedicalRecordRepository.listMedicalRecords).mockResolvedValue({
@@ -152,5 +183,27 @@ describe('medical record service', () => {
         roles: [UserRole.SECRETARY],
       }),
     ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('validates patient and pagination when listing records', async () => {
+    await expect(
+      listMedicalRecords('invalid', {}, {
+        id: 'admin-id',
+        roles: [UserRole.ADMIN],
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      listMedicalRecords('10', { pageSize: '0' }, {
+        id: 'admin-id',
+        roles: [UserRole.ADMIN],
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    vi.mocked(PatientRepository.findById).mockResolvedValue(null);
+    await expect(
+      listMedicalRecords('10', {}, {
+        id: 'admin-id',
+        roles: [UserRole.ADMIN],
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 });
