@@ -3,6 +3,7 @@ import * as PatientController from '../controllers/patient.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { authorize } from '../middlewares/rbac.middleware';
 import { UserRole } from '../entities/User';
+import * as MedicalRecordController from '../controllers/medical-record.controller';
 
 const router = Router();
 
@@ -25,6 +26,18 @@ router.delete(
   authenticate,
   authorize(UserRole.ADMIN),
   PatientController.remove,
+);
+router.post(
+  '/:patientId/medical-records',
+  authenticate,
+  authorize(UserRole.DOCTOR),
+  MedicalRecordController.create,
+);
+router.get(
+  '/:patientId/medical-records',
+  authenticate,
+  authorize(UserRole.DOCTOR, UserRole.ADMIN),
+  MedicalRecordController.list,
 );
 
 export default router;
