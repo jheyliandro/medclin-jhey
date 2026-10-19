@@ -17,7 +17,7 @@ export function authenticate(
 
   try {
     const payload = verifyToken(token);
-    req.user = { id: payload.id, role: payload.role };
+    req.user = { id: payload.id, roles: payload.roles };
     next();
   } catch (err) {
     next(err);

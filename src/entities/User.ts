@@ -7,7 +7,8 @@ import {
 
 export enum UserRole {
   ADMIN = 'admin',
-  ATTENDANT = 'attendant',
+  SECRETARY = 'secretary',
+  DOCTOR = 'doctor',
 }
 
 @Entity('users')
@@ -24,12 +25,8 @@ export class User {
   @Column({ type: 'varchar', length: 255 })
   password!: string;
 
-  @Column({
-    type: 'enum',
-    enum: UserRole,
-    default: UserRole.ADMIN,
-  })
-  role!: UserRole;
+  @Column({ type: 'simple-array', default: UserRole.ADMIN })
+  roles!: UserRole[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

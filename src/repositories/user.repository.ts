@@ -1,6 +1,6 @@
 import { AppDataSource } from '../database/data-source';
-import { User, UserRole } from '../entities/User';
-import { RegisterDTO } from '../dtos/auth.dto';
+import { User } from '../entities/User';
+import { CreateUserDTO } from '../dtos/auth.dto';
 
 const userRepo = () => AppDataSource.getRepository(User);
 
@@ -12,12 +12,12 @@ export async function findById(id: string): Promise<User | null> {
   return userRepo().findOneBy({ id });
 }
 
-export async function createUser(dto: RegisterDTO): Promise<User> {
+export async function createUser(dto: CreateUserDTO): Promise<User> {
   const user = userRepo().create({
     name: dto.name,
     email: dto.email,
     password: dto.password,
-    role: dto.role ?? UserRole.ADMIN,
+    roles: dto.roles,
   });
   return userRepo().save(user);
 }
