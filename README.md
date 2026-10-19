@@ -1,289 +1,138 @@
-# MedClinic API - Parte 1
+# MedClinic API — Etapa 2
 
-# Aluno: Jheyliandro Fontoura
-
-API REST para gerenciamento de clínica médica — **Etapa 1: Autenticação e Autorização**.
-
-> Desenvolvida com Node.js, TypeScript, Express.js, TypeORM e PostgreSQL como base de
-> acesso do sistema: cadastro de usuários, autenticação via JWT e controle de permissões (RBAC).
-
----
+API REST para gerenciamento de clínicas médicas, com autenticação JWT, controle
+de acesso por perfil, pacientes, médicos, escalas, agendamentos e prontuários.
 
 ## Tecnologias
 
-| Tecnologia | Versão | Papel |
-|---|---|---|
-| Node.js | ≥ 18 | Runtime |
-| TypeScript | ^5.4 | Linguagem (obrigatório) |
-| Express.js | ^4.19 | Framework HTTP |
-| TypeORM | ^0.3 | ORM / mapeamento objeto-relacional |
-| PostgreSQL | ≥ 14 | Banco de dados relacional |
-| bcryptjs | ^2.4 | Hash de senhas |
-| jsonwebtoken | ^9.0 | Emissão e validação de tokens JWT |
-| dotenv | ^16 | Variáveis de ambiente |
+- Node.js 22, TypeScript, Express e TypeORM
+- PostgreSQL 14+
+- Vitest para testes unitários e cobertura
+- Docker para empacotamento
 
----
+## Requisitos e configuração local
 
-## Pré-requisitos
+- Node.js 22+ e npm
+- PostgreSQL 14+ e um banco de dados vazio
 
-- Node.js ≥ 18 instalado
-- npm ≥ 9 instalado
-- PostgreSQL ≥ 14 em execução local (porta padrão `5432`)
-- Banco de dados `medclin_db` criado:
+Crie o arquivo local de configuração e ajuste os valores:
 
-```sql
-CREATE DATABASE medclin_db;
-```
-
----
-
-## Configuração do ambiente
-
-1. Copie o arquivo de exemplo de variáveis de ambiente:
-
-```bash
+```sh
 cp .env.example .env
 ```
 
-2. Edite o `.env` com suas credenciais:
+Configure `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS` e `DB_NAME`. `DB_SSL=true`
+ativa SSL com validação do certificado do servidor. Defina também um `JWT_SECRET`
+forte e as credenciais iniciais do administrador (`ADMIN_NAME`, `ADMIN_EMAIL`,
+`ADMIN_PASSWORD`).
 
-```env
-# Servidor
-PORT=3000
+Instale, compile e execute:
 
-# Banco de dados PostgreSQL
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASS=sua_senha_aqui
-DB_NAME=medclin_db
-
-# JWT
-JWT_SECRET=sua_chave_secreta_forte_aqui
-JWT_EXPIRES_IN=1d
-```
-
-O TypeORM usa `synchronize: true` em desenvolvimento, portanto a tabela `users` é criada
-automaticamente na primeira execução.
-
----
-
-## Instalação e execução
-
-```bash
-# Instalar dependências
-npm install
-
-# Rodar em modo desenvolvimento (hot-reload)
-npm run dev
-
-# Compilar para produção
+```sh
+npm ci
 npm run build
-
-# Executar build de produção
 npm start
 ```
 
-A API ficará disponível em `http://localhost:3000/api`.
+Após configurar o banco e compilar a aplicação, crie o primeiro administrador
+uma vez:
 
----
-
-## Arquitetura do projeto
-
-A aplicação segue arquitetura **MVC em camadas**, com separação clara de responsabilidades:
-
-```
-src/
-├── @types/express/       # Extensão da interface Request do Express (req.user)
-├── controllers/          # Recebem requisições HTTP, delegam ao service, devolvem resposta
-├── database/             # Configuração do DataSource (TypeORM)
-├── dtos/                 # Interfaces de entrada e saída de dados (sem password)
-├── entities/             # Entidades do TypeORM (@Entity, @Column, etc.)
-├── middlewares/          # authenticate (JWT), authorize (RBAC), errorHandler
-├── repositories/         # Acesso ao banco de dados via TypeORM
-├── routes/               # Definição dos endpoints e aplicação dos middlewares
-├── services/             # Regras de negócio (validações, hash, JWT)
-├── utils/                # AppError, funções de hash (bcrypt) e JWT
-└── server.ts             # Bootstrap: Express + TypeORM + rotas + error handler
+```sh
+npm run seed:admin
 ```
 
-**Fluxo de uma requisição:**
+O seed é idempotente: se o e-mail já existir, não altera o usuário existente.
+Para Docker, execute o comando no contêiner antes de iniciar o serviço:
+`docker run --rm --env-file .env medclinic-api npm run seed:admin`.
 
-```
-Client → Routes → Middlewares → Controller → Service → Repository → PostgreSQL
-                                                                   ↑
-                                                             (TypeORM)
-```
+Para desenvolvimento com recarga automática, execute `npm run dev`. A API fica
+disponível em `http://localhost:3000/api/v1`; `GET /api/v1/health` verifica a
+disponibilidade HTTP. Migrações TypeORM são executadas ao iniciar o servidor.
+O `synchronize` do TypeORM fica desativado.
 
----
+## Docker
 
-## Perfis de acesso (RBAC)
+Construa e inicie a imagem, fornecendo as variáveis de ambiente indicadas no
+`.env.example` para o contêiner:
 
-| Perfil | Valor no banco | Descrição |
-|---|---|---|
-| Administrador | `admin` | Acesso completo a todos os endpoints |
-| Atendente | `attendant` | Acesso operacional com permissões restritas |
-
-> O perfil padrão atribuído no cadastro via `POST /api/auth/register` é **`admin`**.
-> Para criar um usuário com perfil `attendant`, envie `"role": "attendant"` no body.
-
----
-
-## Endpoints
-
-Prefixo base: **`/api`**
-
-### Autenticação
-
----
-
-#### `POST /api/auth/register` — Cadastro de usuário
-
-Cria um novo usuário. Senha nunca é armazenada ou retornada em texto puro.
-
-**Body (JSON):**
-
-```json
-{
-  "name": "João Silva",
-  "email": "joao@email.com",
-  "password": "senha123",
-  "role": "admin"
-}
+```sh
+docker build -t medclinic-api .
+docker run --rm -p 3000:3000 --env-file .env medclinic-api
 ```
 
-> Campo `role` é opcional. Valores aceitos: `"admin"` | `"attendant"`. Padrão: `"admin"`.
+O contêiner não inclui o arquivo `.env`; mantenha-o local e forneça os segredos
+por configuração de ambiente no runtime.
+Em plataformas com health check configurável, use o caminho
+`/api/v1/health`.
 
-**Resposta de sucesso — `201 Created`:**
+## Perfis de acesso
 
-```json
-{
-  "message": "Usuário criado com sucesso.",
-  "user": {
-    "id": "uuid-gerado",
-    "name": "João Silva",
-    "email": "joao@email.com",
-    "role": "admin",
-    "createdAt": "2025-01-01T00:00:00.000Z"
-  }
-}
+| Perfil | Responsabilidade |
+| --- | --- |
+| `admin` | Gerencia usuários, médicos, escalas e todos os recursos |
+| `secretary` | Gerencia pacientes e agenda operacional |
+| `doctor` | Consulta sua agenda e gerencia prontuários dos pacientes vinculados |
+
+Usuários são criados por `POST /api/v1/users`, disponível somente a
+administradores. A autenticação é feita por `POST /api/v1/auth/login`. Use o
+token retornado como `Authorization: Bearer <accessToken>`. As respostas de
+autenticação e do endpoint `/users/me` expõem `roles` como uma lista.
+
+## Principais endpoints
+
+Todas as rotas, exceto login e health check, requerem autenticação.
+
+| Método | Endpoint | Acesso / finalidade |
+| --- | --- | --- |
+| `GET` | `/api/v1/health` | Verificação de saúde |
+| `POST` | `/api/v1/auth/login` | Autenticação |
+| `POST` | `/api/v1/users` | Admin: criação de usuário |
+| `GET` | `/api/v1/users/me` | Dados do usuário autenticado |
+| `GET`, `POST` | `/api/v1/patients` | Consulta; admin/secretary cadastram |
+| `GET`, `PATCH`, `DELETE` | `/api/v1/patients/:id` | Consulta/edição; exclusão admin |
+| `POST`, `GET` | `/api/v1/patients/:patientId/medical-records` | Criação por médico; leitura por médico/admin com vínculo permitido |
+| `GET`, `POST` | `/api/v1/doctors` | Consulta; criação admin |
+| `GET`, `PUT` | `/api/v1/doctors/:doctorId/work-schedule` | Consulta; substituição admin |
+| `GET` | `/api/v1/doctors/:doctorId/calendar` | Agenda do médico |
+| `GET`, `POST` | `/api/v1/appointments` | Consulta; criação admin/secretary |
+| `GET` | `/api/v1/appointments/:id` | Detalhe permitido conforme vínculo e perfil |
+| `PATCH` | `/api/v1/appointments/:id/status` | Atualização sujeita a transições e permissões |
+
+Listas paginadas usam `page` e `pageSize`. Agenda, filtros e operações clínicas
+validam identificadores, datas, disponibilidade e relacionamento entre usuários,
+profissionais e pacientes. Erros seguem o envelope JSON da API com `code` e
+mensagem.
+
+## Testes e cobertura
+
+```sh
+npm test
+npm run test:cov
 ```
 
-**Respostas de erro:**
+A cobertura é aplicada aos serviços (`src/**/*.service.ts`), e o comando de
+cobertura falha se statements, branches, functions ou lines ficarem abaixo de
+80%. O workflow de Pull Request executa instalação limpa, build e cobertura.
 
-| Status | Situação |
-|---|---|
-| `400` | Campos obrigatórios ausentes ou e-mail inválido |
-| `409` | E-mail já cadastrado |
+## Deploy no Render
 
----
+Crie no Render um Web Service conectado ao repositório e configure-o para usar o
+`Dockerfile` da raiz. Configure no serviço as variáveis de ambiente de
+`.env.example`, apontando para um PostgreSQL gerenciado. Defina `DB_SSL=true`
+quando o provedor exigir conexão TLS.
 
-#### `POST /api/auth/login` — Login do usuário
+Execute `npm run seed:admin` uma vez usando as variáveis de produção e acesso ao
+banco antes de liberar o serviço para os usuários.
 
-Valida as credenciais e retorna um token JWT.
+Para ativar deploy automático, crie um Deploy Hook no serviço Render e salve a
+URL como secret `RENDER_DEPLOY_HOOK_URL` nas configurações do repositório GitHub.
+O workflow `.github/workflows/deploy-render.yml` aciona o hook após atualizações
+em `main` ou manualmente; sem o secret, o workflow registra um aviso e pula o
+deploy. Configure e valide as credenciais diretamente nos respectivos serviços;
+não as adicione ao repositório.
 
-**Body (JSON):**
+## Segurança de arquivos locais
 
-```json
-{
-  "email": "joao@email.com",
-  "password": "senha123"
-}
-```
-
-**Resposta de sucesso — `200 OK`:**
-
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "uuid-gerado",
-    "name": "João Silva",
-    "email": "joao@email.com",
-    "role": "admin",
-    "createdAt": "2025-01-01T00:00:00.000Z"
-  }
-}
-```
-
-**Respostas de erro:**
-
-| Status | Situação |
-|---|---|
-| `400` | Campos obrigatórios ausentes |
-| `401` | Credenciais inválidas (e-mail ou senha incorretos) |
-
----
-
-### Rotas protegidas
-
-> Todas as rotas abaixo exigem o header:
-> ```
-> Authorization: Bearer <token>
-> ```
-
----
-
-#### `GET /api/users/me` — Dados do usuário autenticado
-
-Retorna os dados do usuário identificado pelo token JWT.
-
-**Resposta de sucesso — `200 OK`:**
-
-```json
-{
-  "user": {
-    "id": "uuid-gerado",
-    "name": "João Silva",
-    "email": "joao@email.com",
-    "role": "admin",
-    "createdAt": "2025-01-01T00:00:00.000Z"
-  }
-}
-```
-
-**Respostas de erro:**
-
-| Status | Situação |
-|---|---|
-| `401` | Token ausente, inválido ou expirado |
-| `404` | Usuário do token não encontrado no banco |
-
----
-
-#### `GET /api/admin/ping` — Verificação de acesso de Administrador
-
-Endpoint restrito ao perfil `admin`. Demonstra o funcionamento do RBAC.
-
-**Resposta de sucesso — `200 OK`:**
-
-```json
-{
-  "message": "pong",
-  "role": "admin"
-}
-```
-
-**Respostas de erro:**
-
-| Status | Situação |
-|---|---|
-| `401` | Token ausente, inválido ou expirado |
-| `403` | Usuário autenticado sem perfil `admin` |
-
----
-
-## Variáveis de ambiente
-
-| Variável | Descrição | Exemplo |
-|---|---|---|
-| `PORT` | Porta do servidor | `3000` |
-| `DB_HOST` | Host do PostgreSQL | `localhost` |
-| `DB_PORT` | Porta do PostgreSQL | `5432` |
-| `DB_USER` | Usuário do banco | `postgres` |
-| `DB_PASS` | Senha do banco | `postgres` |
-| `DB_NAME` | Nome do banco | `medclin_db` |
-| `JWT_SECRET` | Chave secreta para assinar tokens | string longa e aleatória |
-| `JWT_EXPIRES_IN` | Tempo de expiração do token | `1d`, `8h`, `30m` |
-
----
+`folderignore/` contém configuração local e material sensível. A pasta é
+explicitamente ignorada pelo Git e pelo Docker e não deve ser adicionada aos
+commits.
