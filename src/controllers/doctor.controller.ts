@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as DoctorService from '../services/doctor.service';
+import * as AppointmentService from '../services/appointment.service';
 import { CreateDoctorDTO, WorkScheduleDTO } from '../dtos/doctor.dto';
 
 export async function create(
@@ -71,6 +72,23 @@ export async function getWorkSchedule(
       req.params.doctorId,
     );
     res.status(200).json(schedule);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function calendar(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const result = await AppointmentService.getDoctorCalendar(
+      req.params.doctorId,
+      req.query.from,
+      req.query.to,
+    );
+    res.status(200).json(result);
   } catch (err) {
     next(err);
   }
