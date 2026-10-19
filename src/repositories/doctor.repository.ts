@@ -16,6 +16,13 @@ export async function findByCrm(crm: string): Promise<Doctor | null> {
   return AppDataSource.getRepository(Doctor).findOneBy({ crm });
 }
 
+export async function findByUserId(userId: string): Promise<Doctor | null> {
+  return AppDataSource.getRepository(Doctor).findOne({
+    where: { user: { id: userId } },
+    relations: { user: true },
+  });
+}
+
 export async function createDoctorWithUser(
   dto: CreateDoctorDTO & { password: string },
 ): Promise<Doctor> {

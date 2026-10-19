@@ -24,6 +24,7 @@ router.put(
   authorize(UserRole.ADMIN),
   DoctorController.replaceWorkSchedule,
 );
+router.get('/:doctorId/calendar', authenticate, DoctorController.calendar);
 router.get('/:id', authenticate, DoctorController.getById);
 
 export default router;
