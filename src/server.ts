@@ -1,25 +1,16 @@
 import 'reflect-metadata';
 import 'dotenv/config';
-import express from 'express';
 import { AppDataSource } from './database/data-source';
-import routes from './routes';
-import { errorHandler } from './middlewares/error.middleware';
+import { app } from './app';
 
-const app = express();
-app.use(express.json());
-
-app.use('/api', routes);
-
-app.use(errorHandler);
-
-const PORT = process.env.PORT ?? 3000;
+const PORT = Number(process.env.PORT ?? 3000);
 
 AppDataSource.initialize()
   .then(() => {
     console.log('📦 Banco de dados conectado com sucesso.');
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 MedClinic API rodando em http://localhost:${PORT}`);
-      console.log('   Prefixo base: /api');
+      console.log('   Prefixo base: /api/v1');
     });
   })
   .catch((err: unknown) => {
