@@ -1,6 +1,7 @@
 node_modules/
 folderignore/
 dist/
+coverage/
 .env
 *.js.map
 .tokengit
