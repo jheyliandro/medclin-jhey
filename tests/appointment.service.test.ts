@@ -12,6 +12,7 @@ import * as PatientRepository from '../src/repositories/patient.repository';
 import { AppError } from '../src/utils/AppError';
 import {
   createAppointment,
+  changeAppointmentStatus,
   getAppointment,
   getDoctorCalendar,
   listAppointments,
@@ -22,6 +23,8 @@ vi.mock('../src/repositories/appointment.repository', () => ({
   findCalendarAppointments: vi.fn(),
   findById: vi.fn(),
   listAppointments: vi.fn(),
+  saveStatus: vi.fn(),
+  hasClinicalRelationship: vi.fn(),
 }));
 
 vi.mock('../src/repositories/doctor.repository', () => ({
@@ -231,6 +234,39 @@ describe('appointment service', () => {
 
     await expect(
       getAppointment(41, { id: 'other-user', roles: [UserRole.DOCTOR] }),
+    ).rejects.toMatchObject({ statusCode: 403, code: 'ACESSO_NEGADO' });
+  });
+
+  it('allows the assigned doctor to start an appointment', async () => {
+    vi.mocked(AppointmentRepository.findById).mockResolvedValue(appointment);
+    vi.mocked(AppointmentRepository.saveStatus).mockImplementation(
+      async (_appointment, status) => ({ ...appointment, status }),
+    );
+
+    const started = await changeAppointmentStatus(41, 'in_progress', {
+      id: 'doctor-user-id',
+      roles: [UserRole.DOCTOR],
+    });
+    expect(started.status).toBe(AppointmentStatus.IN_PROGRESS);
+  });
+
+  it('distinguishes invalid transitions from missing authority', async () => {
+    vi.mocked(AppointmentRepository.findById).mockResolvedValue(appointment);
+
+    await expect(
+      changeAppointmentStatus(41, 'done', {
+        id: 'doctor-user-id',
+        roles: [UserRole.DOCTOR],
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'TRANSICAO_INVALIDA',
+    });
+    await expect(
+      changeAppointmentStatus(41, 'in_progress', {
+        id: 'other-user',
+        roles: [UserRole.DOCTOR],
+      }),
     ).rejects.toMatchObject({ statusCode: 403, code: 'ACESSO_NEGADO' });
   });
 });

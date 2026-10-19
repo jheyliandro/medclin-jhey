@@ -322,3 +322,54 @@ export async function getAppointment(
   }
   return toResponse(appointment);
 }
+
+export async function changeAppointmentStatus(
+  idValue: unknown,
+  targetValue: unknown,
+  user: { id: string; roles: UserRole[] },
+): Promise<AppointmentResponseDTO> {
+  if (!isAppointmentStatus(targetValue)) {
+    throw new AppError('Status de agendamento inválido.', 400);
+  }
+  const appointment = await AppointmentRepository.findById(
+    parseId(idValue, 'agendamento'),
+  );
+  if (!appointment) {
+    throw new AppError('Agendamento não encontrado.', 404);
+  }
+
+  const validTransition =
+    (appointment.status === AppointmentStatus.SCHEDULED &&
+      (targetValue === AppointmentStatus.IN_PROGRESS ||
+        targetValue === AppointmentStatus.CANCELLED)) ||
+    (appointment.status === AppointmentStatus.IN_PROGRESS &&
+      (targetValue === AppointmentStatus.DONE ||
+        targetValue === AppointmentStatus.CANCELLED));
+  if (!validTransition) {
+    throw new AppError(
+      'Transição de status não permitida.',
+      422,
+      'TRANSICAO_INVALIDA',
+    );
+  }
+
+  const isAdmin = user.roles.includes(UserRole.ADMIN);
+  const isDoctorOwner =
+    user.roles.includes(UserRole.DOCTOR) &&
+    appointment.doctor.user.id === user.id;
+  const isSecretary = user.roles.includes(UserRole.SECRETARY);
+  const authorized =
+    isAdmin ||
+    (targetValue !== AppointmentStatus.CANCELLED && isDoctorOwner) ||
+    (targetValue === AppointmentStatus.CANCELLED &&
+      (isDoctorOwner ||
+        (appointment.status === AppointmentStatus.SCHEDULED && isSecretary)));
+
+  if (!authorized) {
+    throw new AppError('Acesso negado para esta transição.', 403);
+  }
+
+  return toResponse(
+    await AppointmentRepository.saveStatus(appointment, targetValue),
+  );
+}
