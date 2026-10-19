@@ -1,11 +1,13 @@
 {
   "name": "medclinic-api",
   "version": "1.0.0",
-  "description": "MedClinic API — Etapa 1: Autenticação e Autorização",
+  "description": "MedClinic API — Etapa 2: agendamento, escala e prontuário",
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage",
     "start": "node dist/server.js"
   },
   "dependencies": {
@@ -22,7 +24,11 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.14.2",
+    "@types/supertest": "^6.0.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "@vitest/coverage-v8": "^2.1.9",
+    "supertest": "^7.0.0",
+    "vitest": "^2.1.9"
   }
 }
