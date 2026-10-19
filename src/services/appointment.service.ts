@@ -83,6 +83,10 @@ function toClock(value: string): string {
   return value.slice(0, 5);
 }
 
+function isAppointmentStatus(value: unknown): value is AppointmentStatus {
+  return Object.values(AppointmentStatus).some((status) => status === value);
+}
+
 export async function createAppointment(
   dto: CreateAppointmentDTO,
 ): Promise<AppointmentResponseDTO> {
@@ -232,15 +236,10 @@ export async function listAppointments(
 
   let status: AppointmentStatus | undefined;
   if (query.status !== undefined) {
-    if (
-      typeof query.status !== 'string' ||
-      !Object.values(AppointmentStatus).includes(
-        query.status as AppointmentStatus,
-      )
-    ) {
+    if (!isAppointmentStatus(query.status)) {
       throw new AppError('Status de agendamento inválido.', 400);
     }
-    status = query.status as AppointmentStatus;
+    status = query.status;
   }
 
   const fromDate =
