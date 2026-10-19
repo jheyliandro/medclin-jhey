@@ -1,5 +1,7 @@
 import { DataSource } from 'typeorm';
 import { User } from '../entities/User';
+import { Patient } from '../entities/Patient';
+import { InitialSchema1760910000000 } from './migrations/InitialSchema1760910000000';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -8,9 +10,10 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER ?? 'postgres',
   password: process.env.DB_PASS ?? 'postgres',
   database: process.env.DB_NAME ?? 'medclin_db',
-  synchronize: true,
+  synchronize: false,
   logging: false,
-  entities: [User],
-  migrations: [],
+  entities: [User, Patient],
+  migrations: [InitialSchema1760910000000],
   subscribers: [],
+  migrationsRun: true,
 });
