@@ -7,6 +7,7 @@ import {
 import { PaginatedResponse } from '../dtos/pagination.dto';
 import * as PatientRepository from '../repositories/patient.repository';
 import { AppError } from '../utils/AppError';
+import { parsePagination } from '../utils/pagination';
 
 function isUniqueViolation(error: unknown): boolean {
   if (!(error instanceof QueryFailedError)) {
@@ -43,24 +44,6 @@ function parseId(id: unknown): number {
     parsed <= 0
   ) {
     throw new AppError('Identificador de paciente inválido.', 400);
-  }
-  return parsed;
-}
-
-function parsePositiveInteger(
-  value: unknown,
-  fallback: number,
-  maximum = Number.MAX_SAFE_INTEGER,
-): number {
-  if (value === undefined) {
-    return fallback;
-  }
-  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
-    throw new AppError('Parâmetro de paginação inválido.', 400);
-  }
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > maximum) {
-    throw new AppError('Parâmetro de paginação inválido.', 400);
   }
   return parsed;
 }
@@ -137,8 +120,7 @@ export async function listPatients(query: {
   pageSize?: unknown;
   name?: unknown;
 }): Promise<PaginatedResponse<PatientResponseDTO>> {
-  const page = parsePositiveInteger(query.page, 1);
-  const pageSize = parsePositiveInteger(query.pageSize, 20, 100);
+  const { page, pageSize } = parsePagination(query);
   if (query.name !== undefined && typeof query.name !== 'string') {
     throw new AppError('Parâmetro de busca inválido.', 400);
   }
