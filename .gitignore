@@ -1,4 +1,5 @@
 node_modules/
+folderignore/
 dist/
 .env
 *.js.map
