@@ -8,7 +8,7 @@ export function authorize(...roles: UserRole[]) {
       return next(new AppError('Não autenticado.', 401));
     }
 
-    if (!roles.includes(req.user.role)) {
+    if (!req.user.roles.some((role) => roles.includes(role))) {
       return next(
         new AppError('Acesso negado: permissão insuficiente.', 403),
       );

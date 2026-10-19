@@ -4,10 +4,14 @@ import { UserRole } from '../entities/User';
 
 export interface TokenPayload extends JwtPayload {
   id: string;
-  role: UserRole;
+  roles: UserRole[];
 }
 
-export function generateToken(payload: { id: string; role: UserRole }): string {
+function isUserRole(role: unknown): role is UserRole {
+  return Object.values(UserRole).some((validRole) => validRole === role);
+}
+
+export function generateToken(payload: { id: string; roles: UserRole[] }): string {
   const secret = process.env.JWT_SECRET;
   const expiresIn = process.env.JWT_EXPIRES_IN ?? '1d';
 
@@ -26,7 +30,18 @@ export function verifyToken(token: string): TokenPayload {
   }
 
   try {
-    return jwt.verify(token, secret) as TokenPayload;
+    const payload = jwt.verify(token, secret);
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      typeof payload.id !== 'string' ||
+      !Array.isArray(payload.roles) ||
+      !payload.roles.every(isUserRole)
+    ) {
+      throw new Error('Token payload inválido.');
+    }
+
+    return payload as TokenPayload;
   } catch {
     throw new AppError('Token inválido ou expirado.', 401);
   }

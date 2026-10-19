@@ -9,10 +9,18 @@ export function errorHandler(
   next: NextFunction,
 ): void {
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({ message: err.message });
+    res.status(err.statusCode).json({
+      statusCode: err.statusCode,
+      error: err.code,
+      message: err.message,
+    });
     return;
   }
 
   console.error('Erro inesperado:', err);
-  res.status(500).json({ message: 'Erro interno do servidor.' });
+  res.status(500).json({
+    statusCode: 500,
+    error: 'DADOS_INVALIDOS',
+    message: 'Erro interno do servidor.',
+  });
 }
