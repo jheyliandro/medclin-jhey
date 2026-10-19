@@ -166,6 +166,43 @@ describe('appointment service', () => {
         startsAt: '2026-02-31T08:00:00-03:00',
       }),
     ).rejects.toMatchObject({ statusCode: 400 });
+
+    await expect(
+      createAppointment({
+        doctorId: 3,
+        patientId: 10,
+        startsAt: '2026-10-20T08:00:00',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    vi.mocked(PatientRepository.findById).mockResolvedValue(null);
+    await expect(
+      createAppointment({
+        doctorId: 3,
+        patientId: 10,
+        startsAt: '2026-10-20T08:00:00-03:00',
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('rejects invalid identifiers and nonzero seconds in appointment starts', async () => {
+    await expect(
+      createAppointment({
+        doctorId: 0,
+        patientId: 10,
+        startsAt: '2026-10-20T08:00:00-03:00',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      createAppointment({
+        doctorId: 3,
+        patientId: 10,
+        startsAt: '2026-10-20T08:00:30-03:00',
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'HORARIO_FORA_DA_ESCALA',
+    });
   });
 
   it('returns the calendar in the clinic local-date range', async () => {
@@ -202,6 +239,16 @@ describe('appointment service', () => {
     await expect(
       getDoctorCalendar(3, '2026-02-30', '2026-02-30'),
     ).rejects.toBeInstanceOf(AppError);
+    await expect(
+      getDoctorCalendar(3, '2026-10-20', '2026-10-20T00:00:00Z'),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      getDoctorCalendar('invalid', '2026-10-20', '2026-10-20'),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    vi.mocked(DoctorRepository.findById).mockResolvedValue(null);
+    await expect(
+      getDoctorCalendar(3, '2026-10-20', '2026-10-20'),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('forces doctors to list only their own appointments', async () => {
@@ -227,6 +274,24 @@ describe('appointment service', () => {
         { id: 'admin-id', roles: [UserRole.ADMIN] },
       ),
     ).rejects.toMatchObject({ statusCode: 400, code: 'DADOS_INVALIDOS' });
+    await expect(
+      listAppointments(
+        { from: '2026-10-21', to: '2026-10-20' },
+        { id: 'admin-id', roles: [UserRole.ADMIN] },
+      ),
+    ).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('returns an empty doctor list when the user has no doctor profile', async () => {
+    vi.mocked(DoctorRepository.findByUserId).mockResolvedValue(null);
+
+    await expect(
+      listAppointments({}, { id: 'doctor-user-id', roles: [UserRole.DOCTOR] }),
+    ).resolves.toEqual({
+      data: [],
+      meta: { total: 0, page: 1, pageSize: 20, totalPages: 0 },
+    });
+    expect(AppointmentRepository.listAppointments).not.toHaveBeenCalled();
   });
 
   it('denies a doctor access to another doctor appointment', async () => {
@@ -235,6 +300,15 @@ describe('appointment service', () => {
     await expect(
       getAppointment(41, { id: 'other-user', roles: [UserRole.DOCTOR] }),
     ).rejects.toMatchObject({ statusCode: 403, code: 'ACESSO_NEGADO' });
+
+    vi.mocked(AppointmentRepository.findById).mockResolvedValue(null);
+    await expect(
+      getAppointment(999, { id: 'admin-id', roles: [UserRole.ADMIN] }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    vi.mocked(AppointmentRepository.findById).mockResolvedValue(appointment);
+    await expect(
+      getAppointment(41, { id: 'doctor-user-id', roles: [UserRole.DOCTOR] }),
+    ).resolves.toMatchObject({ id: 41 });
   });
 
   it('allows the assigned doctor to start an appointment', async () => {
@@ -268,5 +342,48 @@ describe('appointment service', () => {
         roles: [UserRole.DOCTOR],
       }),
     ).rejects.toMatchObject({ statusCode: 403, code: 'ACESSO_NEGADO' });
+    await expect(
+      changeAppointmentStatus(41, 'invalid', {
+        id: 'admin-id',
+        roles: [UserRole.ADMIN],
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+    vi.mocked(AppointmentRepository.findById).mockResolvedValue(null);
+    await expect(
+      changeAppointmentStatus(41, 'in_progress', {
+        id: 'admin-id',
+        roles: [UserRole.ADMIN],
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('allows secretary cancellation only while scheduled and admin cancellation in progress', async () => {
+    vi.mocked(AppointmentRepository.findById).mockResolvedValue(appointment);
+    vi.mocked(AppointmentRepository.saveStatus).mockImplementation(
+      async (_appointment, status) => ({ ...appointment, status }),
+    );
+    await expect(
+      changeAppointmentStatus(41, 'cancelled', {
+        id: 'secretary-id',
+        roles: [UserRole.SECRETARY],
+      }),
+    ).resolves.toMatchObject({ status: AppointmentStatus.CANCELLED });
+
+    vi.mocked(AppointmentRepository.findById).mockResolvedValue({
+      ...appointment,
+      status: AppointmentStatus.IN_PROGRESS,
+    });
+    await expect(
+      changeAppointmentStatus(41, 'cancelled', {
+        id: 'secretary-id',
+        roles: [UserRole.SECRETARY],
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await expect(
+      changeAppointmentStatus(41, 'cancelled', {
+        id: 'admin-id',
+        roles: [UserRole.ADMIN],
+      }),
+    ).resolves.toMatchObject({ status: AppointmentStatus.CANCELLED });
   });
 });
