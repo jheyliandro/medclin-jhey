@@ -63,7 +63,11 @@ describe('patient service', () => {
   it('maps a concurrent CPF uniqueness violation to the contract error', async () => {
     vi.mocked(PatientRepository.findByCpf).mockResolvedValue(null);
     vi.mocked(PatientRepository.createPatient).mockRejectedValue(
-      new QueryFailedError('INSERT INTO patients', [], { code: '23505' }),
+      new QueryFailedError(
+        'INSERT INTO patients',
+        [],
+        Object.assign(new Error('unique violation'), { code: '23505' }),
+      ),
     );
 
     await expect(
