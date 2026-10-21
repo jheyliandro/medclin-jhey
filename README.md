@@ -26,6 +26,11 @@ ativa SSL com validação do certificado do servidor. Defina também um `JWT_SEC
 forte e as credenciais iniciais do administrador (`ADMIN_NAME`, `ADMIN_EMAIL`,
 `ADMIN_PASSWORD`).
 
+Se preferir, informe a URL completa em `DATABASE_URL`; quando definida, ela tem
+precedência sobre as variáveis `DB_*`. Para conexões externas ao PostgreSQL do
+Render, use a URL externa com `sslmode=verify-full` para exigir TLS e validar o
+certificado.
+
 Instale, compile e execute:
 
 ```sh
