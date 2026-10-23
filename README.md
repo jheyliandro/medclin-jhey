@@ -45,8 +45,16 @@ npm start
 O seed idempotente cria o administrador, duas contas secretary, duas contas
 doctor com seus perfis de médico e completa a base até pelo menos dez pacientes.
 Contas já existentes não têm senha nem dados alterados. Para Docker, o seed é
-executado automaticamente quando o contêiner inicia, antes da API; garanta que
-o banco esteja acessível e todas as variáveis acima estejam configuradas.
+manual: só execute `npm run seed` quando desejar inserir esses dados de
+demonstração em um banco.
+
+Também há um script SQL manual em `database/seed.sql`, para PostgreSQL já
+migrado. Ele inclui administrador, duas secretarias, dois médicos e dez pacientes
+de demonstração. Antes de executá-lo, substitua os cinco hashes bcrypt de
+exemplo e ajuste e-mails/CRMs conforme necessário. Execute com
+`psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/seed.sql`. O script é
+idempotente e aborta se os hashes ainda forem placeholders ou se contas
+existentes não tiverem os perfis esperados.
 
 Para desenvolvimento com recarga automática, execute `npm run dev`. A API fica
 disponível em `http://localhost:3000/api/v1`; `GET /api/v1/health` verifica a
@@ -56,8 +64,8 @@ O `synchronize` do TypeORM fica desativado.
 ## Docker
 
 Construa a imagem sem incluir nela o arquivo `.env` nem valores secretos. Passe
-as variáveis ao iniciar o contêiner com `--env-file`; o seed e a API recebem
-essas configurações em tempo de execução:
+as variáveis ao iniciar o contêiner com `--env-file`; isso inicia a API, sem
+executar o seed:
 
 ```sh
 docker build -t medclinic-api .
@@ -65,7 +73,8 @@ docker run --rm -p 3000:3000 --env-file .env medclinic-api
 ```
 
 O `.env` deve permanecer local e fora da imagem. Configure nele as variáveis de
-`.env.example`, incluindo as credenciais usadas pelo seed.
+`.env.example` necessárias para a API. Para executar o seed manualmente em
+Docker, rode `docker run --rm --env-file .env medclinic-api npm run seed`.
 Em plataformas com health check configurável, use o caminho
 `/api/v1/health`.
 
@@ -123,8 +132,8 @@ cobertura falha se statements, branches, functions ou lines ficarem abaixo de
 Crie no Render um Web Service conectado ao repositório e configure-o para usar o
 `Dockerfile` da raiz. Configure no serviço as variáveis de ambiente de
 `.env.example`, apontando para um PostgreSQL gerenciado. Defina `DB_SSL=true`
-quando o provedor exigir conexão TLS. Na inicialização do contêiner, o seed roda
-antes da API e cria os dados iniciais caso ainda não existam.
+quando o provedor exigir conexão TLS. O contêiner inicia a API e executa as
+migrations, mas não popula dados de seed automaticamente.
 
 Para ativar deploy automático, crie um Deploy Hook no serviço Render e salve a
 URL como secret `RENDER_DEPLOY_HOOK_URL` nas configurações do repositório GitHub.
