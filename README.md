@@ -23,8 +23,10 @@ cp .env.example .env
 
 Configure `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS` e `DB_NAME`. `DB_SSL=true`
 ativa SSL com validação do certificado do servidor. Defina também um `JWT_SECRET`
-forte e as credenciais iniciais do administrador (`ADMIN_NAME`, `ADMIN_EMAIL`,
-`ADMIN_PASSWORD`).
+forte, as credenciais iniciais do administrador (`ADMIN_NAME`, `ADMIN_EMAIL`,
+`ADMIN_PASSWORD`) e as credenciais das duas contas secretary e das duas contas
+doctor usadas pelo seed (`SEED_SECRETARY_*` e `SEED_DOCTOR_*`, incluindo um CRM
+único para cada médico).
 
 Se preferir, informe a URL completa em `DATABASE_URL`; quando definida, ela tem
 precedência sobre as variáveis `DB_*`. Para conexões externas ao PostgreSQL do
@@ -36,19 +38,15 @@ Instale, compile e execute:
 ```sh
 npm ci
 npm run build
+npm run seed
 npm start
 ```
 
-Após configurar o banco e compilar a aplicação, crie o primeiro administrador
-uma vez:
-
-```sh
-npm run seed:admin
-```
-
-O seed é idempotente: se o e-mail já existir, não altera o usuário existente.
-Para Docker, execute o comando no contêiner antes de iniciar o serviço:
-`docker run --rm --env-file .env medclinic-api npm run seed:admin`.
+O seed idempotente cria o administrador, duas contas secretary, duas contas
+doctor com seus perfis de médico e completa a base até pelo menos dez pacientes.
+Contas já existentes não têm senha nem dados alterados. Para Docker, o seed é
+executado automaticamente quando o contêiner inicia, antes da API; garanta que
+o banco esteja acessível e todas as variáveis acima estejam configuradas.
 
 Para desenvolvimento com recarga automática, execute `npm run dev`. A API fica
 disponível em `http://localhost:3000/api/v1`; `GET /api/v1/health` verifica a
@@ -124,10 +122,8 @@ cobertura falha se statements, branches, functions ou lines ficarem abaixo de
 Crie no Render um Web Service conectado ao repositório e configure-o para usar o
 `Dockerfile` da raiz. Configure no serviço as variáveis de ambiente de
 `.env.example`, apontando para um PostgreSQL gerenciado. Defina `DB_SSL=true`
-quando o provedor exigir conexão TLS.
-
-Execute `npm run seed:admin` uma vez usando as variáveis de produção e acesso ao
-banco antes de liberar o serviço para os usuários.
+quando o provedor exigir conexão TLS. Na inicialização do contêiner, o seed roda
+antes da API e cria os dados iniciais caso ainda não existam.
 
 Para ativar deploy automático, crie um Deploy Hook no serviço Render e salve a
 URL como secret `RENDER_DEPLOY_HOOK_URL` nas configurações do repositório GitHub.
