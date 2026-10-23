@@ -55,16 +55,17 @@ O `synchronize` do TypeORM fica desativado.
 
 ## Docker
 
-Construa e inicie a imagem, fornecendo as variáveis de ambiente indicadas no
-`.env.example` para o contêiner:
+Construa a imagem sem incluir nela o arquivo `.env` nem valores secretos. Passe
+as variáveis ao iniciar o contêiner com `--env-file`; o seed e a API recebem
+essas configurações em tempo de execução:
 
 ```sh
 docker build -t medclinic-api .
 docker run --rm -p 3000:3000 --env-file .env medclinic-api
 ```
 
-O contêiner não inclui o arquivo `.env`; mantenha-o local e forneça os segredos
-por configuração de ambiente no runtime.
+O `.env` deve permanecer local e fora da imagem. Configure nele as variáveis de
+`.env.example`, incluindo as credenciais usadas pelo seed.
 Em plataformas com health check configurável, use o caminho
 `/api/v1/health`.
 
