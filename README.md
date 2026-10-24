@@ -124,6 +124,198 @@ validam identificadores, datas, disponibilidade e relacionamento entre usuários
 profissionais e pacientes. Erros seguem o envelope JSON da API com `code` e
 mensagem.
 
+## Testar a API manualmente com `curl`
+
+Os exemplos a seguir usam Bash e a API publicada no Render. `jq` é opcional para
+formatar respostas, mas os comandos de login usam `jq` para construir o JSON e
+extrair o token. Instale-o ou adapte os comandos se não estiver disponível.
+Não compartilhe senhas ou tokens. As operações de criação, alteração e exclusão
+afetam os dados do ambiente usado.
+
+Defina a URL base e confira se a API está disponível:
+
+```sh
+BASE_URL="https://medclin-jhey.onrender.com/api/v1"
+curl --include "$BASE_URL/health/"
+```
+
+O health check deve responder HTTP `200` com `{"status":"ok"}`. A raiz
+`/api/v1/` não é um endpoint e pode responder `404`.
+
+Faça login com uma conta existente; informe as credenciais sem colocá-las no
+README ou em arquivos versionados:
+
+```sh
+read -r -p "E-mail: " EMAIL
+read -r -s -p "Senha: " PASSWORD
+printf '\n'
+
+LOGIN_RESPONSE=$(curl --silent --show-error \
+  --request POST "$BASE_URL/auth/login" \
+  --header "Content-Type: application/json" \
+  --data "$(jq -n --arg email "$EMAIL" --arg password "$PASSWORD" \
+    '{email:$email,password:$password}')")
+unset PASSWORD
+
+printf '%s\n' "$LOGIN_RESPONSE" | jq .
+TOKEN=$(printf '%s' "$LOGIN_RESPONSE" | jq -r '.accessToken')
+test -n "$TOKEN" && test "$TOKEN" != "null" || echo "Não foi possível obter o token"
+```
+
+O login retorna `accessToken`. Use-o nas demais rotas protegidas. Faça login
+novamente com outra conta para testar os perfis `admin`, `secretary` e `doctor`:
+
+```sh
+curl --include "$BASE_URL/users/me" \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+### Pacientes
+
+Todos os perfis autenticados podem listar e consultar pacientes. As listas usam
+paginação (padrão: página `1`, até `20` itens; máximo de `100` por página) e
+aceitam filtro pelo nome:
+
+```sh
+curl --include "$BASE_URL/patients?page=1&pageSize=10" \
+  --header "Authorization: Bearer $TOKEN"
+
+curl --get --include "$BASE_URL/patients" \
+  --header "Authorization: Bearer $TOKEN" \
+  --data-urlencode "name=Maria"
+
+PATIENT_ID=1
+curl --include "$BASE_URL/patients/$PATIENT_ID" \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+Administradores e secretarias podem cadastrar e editar pacientes. O CPF precisa
+ter 11 dígitos e ser único. Somente administradores podem excluir:
+
+```sh
+curl --include --request POST "$BASE_URL/patients" \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{"name":"Paciente Teste Curl","cpf":"12345678901"}'
+
+curl --include --request PATCH "$BASE_URL/patients/$PATIENT_ID" \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{"name":"Paciente Teste Atualizado"}'
+
+curl --include --request DELETE "$BASE_URL/patients/$PATIENT_ID" \
+  --header "Authorization: Bearer $TOKEN"
+```
+
+Use apenas registros de teste para alterações e exclusões. Pacientes vinculados a
+agendamentos podem não ser excluídos.
+
+### Médicos, escalas e agendamentos
+
+Usuários autenticados podem consultar médicos e escalas; somente administradores
+podem criar médicos ou substituir escalas. O `weekDay` vai de `0` (domingo) a
+`6` (sábado). A substituição da escala remove os turnos anteriores:
+
+```sh
+curl --include "$BASE_URL/doctors?page=1&pageSize=20" \
+  --header "Authorization: Bearer $TOKEN"
+
+DOCTOR_ID=1
+curl --include "$BASE_URL/doctors/$DOCTOR_ID/work-schedule" \
+  --header "Authorization: Bearer $TOKEN"
+
+curl --include --request PUT "$BASE_URL/doctors/$DOCTOR_ID/work-schedule" \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "shifts":[
+      {"weekDay":1,"startTime":"09:00","endTime":"12:00","slotDurationMinutes":30}
+    ]
+  }'
+```
+
+Todos os perfis autenticados podem consultar agendamentos; médicos veem apenas
+os próprios. Administradores e secretarias podem criar agendamentos. Use datas
+`YYYY-MM-DD` nos filtros e uma data ISO 8601 com fuso em `startsAt`. O horário
+deve estar dentro da escala do médico e disponível para o paciente e o médico:
+
+```sh
+curl --get --include "$BASE_URL/appointments" \
+  --header "Authorization: Bearer $TOKEN" \
+  --data-urlencode "doctorId=$DOCTOR_ID" \
+  --data-urlencode "patientId=$PATIENT_ID" \
+  --data-urlencode "status=scheduled" \
+  --data-urlencode "from=2026-10-01" \
+  --data-urlencode "to=2026-10-31"
+
+curl --include --request POST "$BASE_URL/appointments" \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Content-Type: application/json" \
+  --data "{
+    \"doctorId\":$DOCTOR_ID,
+    \"patientId\":$PATIENT_ID,
+    \"startsAt\":\"2026-10-26T09:00:00-03:00\"
+  }"
+
+curl --get --include "$BASE_URL/doctors/$DOCTOR_ID/calendar" \
+  --header "Authorization: Bearer $TOKEN" \
+  --data-urlencode "from=2026-10-26" \
+  --data-urlencode "to=2026-10-31"
+```
+
+As datas acima são exemplos; escolha um período válido e futuro de acordo com a
+escala cadastrada. Os status são `scheduled`, `in_progress`, `done` e
+`cancelled`. Uma transição permitida pode ser testada assim:
+
+```sh
+APPOINTMENT_ID=1
+curl --include --request PATCH "$BASE_URL/appointments/$APPOINTMENT_ID/status" \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{"status":"in_progress"}'
+```
+
+As transições são `scheduled` para `in_progress` ou `cancelled`, e
+`in_progress` para `done` ou `cancelled`; permissões também dependem do perfil e
+do vínculo com o agendamento.
+
+### Prontuários e usuários
+
+Administradores podem consultar prontuários. Médicos podem consultar e criar
+anotações para pacientes com quem tenham vínculo clínico. Secretarias não têm
+acesso. Não use dados médicos reais em testes:
+
+```sh
+curl --include "$BASE_URL/patients/$PATIENT_ID/medical-records?page=1&pageSize=20" \
+  --header "Authorization: Bearer $TOKEN"
+
+curl --include --request POST "$BASE_URL/patients/$PATIENT_ID/medical-records" \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{"text":"Anotação clínica de teste."}'
+```
+
+Somente administradores podem criar usuários, com os perfis `admin`,
+`secretary` ou `doctor`:
+
+```sh
+curl --include --request POST "$BASE_URL/users" \
+  --header "Authorization: Bearer $TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "name":"Secretaria Teste Curl",
+    "email":"secretaria-teste-curl@example.com",
+    "password":"SENHA_FORTE_DE_TESTE",
+    "roles":["secretary"]
+  }'
+```
+
+O endpoint administrativo `GET /admin/ping` retorna `200` para administradores
+e `403` para outros perfis. Em geral, `401` indica falta ou invalidade do token,
+`403` falta de permissão, `404` recurso inexistente, `409` conflito e `422`
+regra de negócio não atendida. Use `--include` para ver o status HTTP e o JSON
+de erro retornado.
+
 ## Testes e cobertura
 
 ```sh
