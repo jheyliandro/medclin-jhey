@@ -5,6 +5,9 @@ import { AppError } from './utils/AppError';
 
 const app = express();
 app.use(express.json());
+app.get('/', (_req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 app.use('/api/v1', routes);
 app.use((_req, _res, next) => {
   next(new AppError('Rota não encontrada.', 404));

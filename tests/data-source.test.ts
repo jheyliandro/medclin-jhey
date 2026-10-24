@@ -22,6 +22,38 @@ describe('database connection configuration', () => {
       url: 'postgres://user:password@db.example.com/medclin?sslmode=verify-full',
       ssl: { rejectUnauthorized: true },
     });
+    expect(AppDataSource.options).not.toHaveProperty('host');
+  });
+
+  it('enables TLS without certificate pinning for Render external hosts', async () => {
+    vi.stubEnv(
+      'DATABASE_URL',
+      'postgresql://user:password@dpg-example-a.oregon-postgres.render.com/medclin',
+    );
+    vi.stubEnv('DB_SSL', '');
+    vi.stubEnv('DB_SSL_REJECT_UNAUTHORIZED', '');
+
+    const { AppDataSource } = await import('../src/database/data-source');
+
+    expect(AppDataSource.options).toMatchObject({
+      url: 'postgresql://user:password@dpg-example-a.oregon-postgres.render.com/medclin',
+      ssl: { rejectUnauthorized: false },
+    });
+  });
+
+  it('does not force TLS for a Render internal URL without sslmode', async () => {
+    vi.stubEnv(
+      'DATABASE_URL',
+      'postgresql://user:password@dpg-example-a/medclin',
+    );
+    vi.stubEnv('DB_SSL', '');
+
+    const { AppDataSource } = await import('../src/database/data-source');
+
+    expect(AppDataSource.options).toMatchObject({
+      url: 'postgresql://user:password@dpg-example-a/medclin',
+      ssl: false,
+    });
   });
 
   it('retains individual DB_* settings when DATABASE_URL is absent', async () => {
@@ -43,5 +75,6 @@ describe('database connection configuration', () => {
       database: 'medclin_test',
       ssl: false,
     });
+    expect(AppDataSource.options).not.toHaveProperty('url');
   });
 });

@@ -29,9 +29,17 @@ doctor usadas pelo seed (`SEED_SECRETARY_*` e `SEED_DOCTOR_*`, incluindo um CRM
 único para cada médico).
 
 Se preferir, informe a URL completa em `DATABASE_URL`; quando definida, ela tem
-precedência sobre as variáveis `DB_*`. Para conexões externas ao PostgreSQL do
-Render, use a URL externa com `sslmode=verify-full` para exigir TLS e validar o
-certificado.
+precedência sobre as variáveis `DB_*` e os campos `DB_HOST` / `DB_USER` não são
+enviados ao driver (evita a API tentar `localhost` dentro do contêiner).
+
+Para o PostgreSQL gerenciado do Render: no Web Service use a **Internal
+Database URL** (hostname curto `dpg-...-a`, sem `*.render.com`). TLS não é
+obrigatório nessa rede privada. A **External Database URL**
+(`*.region-postgres.render.com`) é só para ferramentas fora do Render; ela
+exige TLS. A API liga SSL automaticamente quando o host é `*.render.com`
+(`sslmode=require`, sem validar o hostname do certificado). `DB_SSL=true`
+ativa TLS com validação de certificado; `DB_SSL_REJECT_UNAUTHORIZED=false`
+mantém TLS sem essa validação.
 
 Instale, compile e execute:
 
@@ -129,11 +137,31 @@ cobertura falha se statements, branches, functions ou lines ficarem abaixo de
 
 ## Deploy no Render
 
-Crie no Render um Web Service conectado ao repositório e configure-o para usar o
-`Dockerfile` da raiz. Configure no serviço as variáveis de ambiente de
-`.env.example`, apontando para um PostgreSQL gerenciado. Defina `DB_SSL=true`
-quando o provedor exigir conexão TLS. O contêiner inicia a API e executa as
-migrations, mas não popula dados de seed automaticamente.
+O PostgreSQL do Render **não** entra no `Dockerfile`. O Web Service sobe só a
+API; o banco é o serviço Postgres do painel. Criar os dois no mesmo projeto
+**não** liga as credenciais sozinho.
+
+1. Web Service: **Docker**, `Dockerfile` na raiz, mesma região do banco
+   (por exemplo Oregon). Health Check Path: `/api/v1/health` (a raiz `/`
+   também responde `200` para o probe padrão).
+2. No banco, abra **Connect** e copie a **Internal Database URL**.
+3. No Web Service → Environment, defina pelo menos:
+   - `DATABASE_URL` = Internal Database URL
+   - `NODE_ENV=production`
+   - `JWT_SECRET` (valor forte e exclusivo de produção)
+   - `JWT_EXPIRES_IN`
+   - credenciais `ADMIN_*` e, se for popular dados, `SEED_*`
+4. Confirme que o nome do database na URL é o criado no painel (não use um
+   nome local como `medclin_db` se o Render gerou outro).
+5. Não aponte o serviço para `DB_HOST=localhost` nem para um Postgres
+   “de Docker Compose”: no Render não há esse contêiner ao lado da API.
+6. Se precisar da URL externa (notebook, `psql` local), acrescente
+   `?sslmode=require`. Não use essa URL no Web Service.
+
+O contêiner inicia a API e corre as migrations; o seed **não** roda sozinho.
+Depois do primeiro deploy saudável, um Job ou `docker run` equivalente com
+`npm run seed` (mesmo `DATABASE_URL` interno) popula o administrador e os
+dados de demonstração.
 
 Para ativar deploy automático, crie um Deploy Hook no serviço Render e salve a
 URL como secret `RENDER_DEPLOY_HOOK_URL` nas configurações do repositório GitHub.

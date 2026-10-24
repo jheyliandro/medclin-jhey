@@ -10,6 +10,13 @@ describe('health endpoint', () => {
     expect(response.body).toEqual({ status: 'ok' });
   });
 
+  it('returns ok on the root path used by default platform health checks', async () => {
+    const response = await request(app).get('/');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ok' });
+  });
+
   it('does not expose the public registration route', async () => {
     const response = await request(app)
       .post('/api/v1/auth/register')
